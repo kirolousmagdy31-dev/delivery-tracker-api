@@ -1,0 +1,27 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports: ["3306:3306"]
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    environment:
+      DB_DSN: root:root@tcp(mysql:3306)/package_tracking?parseTime=true&charset=utf8mb4
+      JWT_SECRET: app-secret
+      CORS_ORIGIN: "*"
+      PORT: "8080"
+    ports: ["8080:8080"]
+    depends_on: { mysql: { condition: service_healthy } }
+
+volumes:
+  mysql_data:

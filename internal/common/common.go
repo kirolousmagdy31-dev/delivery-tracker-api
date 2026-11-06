@@ -81,7 +81,7 @@ type Claims struct {
 
 type ctxKey struct{}
 
-func secret() []byte { return []byte(Env("JWT_SECRET", "change-me-in-production")) }
+func secret() []byte { return []byte(Env("JWT_SECRET", "app-secret")) }
 
 func NewToken(userID int64, role string) (string, error) {
 	c := Claims{UserID: userID, Role: role, RegisteredClaims: jwt.RegisteredClaims{
