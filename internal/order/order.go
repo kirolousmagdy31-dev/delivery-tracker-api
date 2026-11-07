@@ -31,20 +31,31 @@ func (a *app) create(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		PickupLocation  string  `json:"pickup_location"`
 		DropoffLocation string  `json:"dropoff_location"`
+		CustomerName    string  `json:"customer_name"`
+		CustomerPhone   string  `json:"customer_phone"`
 		PackageDetails  string  `json:"package_details"`
 		DeliveryTime    string  `json:"delivery_time"`
 		DeliveryFee     float64 `json:"delivery_fee"`
+		CollectAmount   float64 `json:"collect_amount"`
 	}
 	if !common.Decode(w, r, &in) {
 		return
 	}
 	in.PickupLocation = strings.TrimSpace(in.PickupLocation)
 	in.DropoffLocation = strings.TrimSpace(in.DropoffLocation)
+	in.CustomerName = strings.TrimSpace(in.CustomerName)
+	in.CustomerPhone = strings.TrimSpace(in.CustomerPhone)
 	in.PackageDetails = strings.TrimSpace(in.PackageDetails)
 	when, err := common.ParseTime(in.DeliveryTime)
 	switch {
 	case in.PickupLocation == "" || in.DropoffLocation == "" || in.PackageDetails == "":
 		common.Error(w, http.StatusBadRequest, "pickup_location, dropoff_location and package_details are required")
+		return
+	case len(in.CustomerName) < 2 || len(in.CustomerName) > 100:
+		common.Error(w, http.StatusBadRequest, "customer_name must be 2-100 characters")
+		return
+	case !common.PhoneRe.MatchString(in.CustomerPhone):
+		common.Error(w, http.StatusBadRequest, "customer_phone must be 8-15 digits (optional leading +)")
 		return
 	case err != nil:
 		common.Error(w, http.StatusBadRequest, "delivery_time must be like 2026-11-10T14:00 or RFC3339")
@@ -55,6 +66,9 @@ func (a *app) create(w http.ResponseWriter, r *http.Request) {
 	case in.DeliveryFee < 0:
 		common.Error(w, http.StatusBadRequest, "delivery_fee cannot be negative")
 		return
+	case in.CollectAmount < 0:
+		common.Error(w, http.StatusBadRequest, "collect_amount cannot be negative")
+		return
 	}
 	uid := common.CurrentUser(r).UserID
 	tx, err := a.db.Begin()
@@ -63,8 +77,10 @@ func (a *app) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(`INSERT INTO orders (user_id,pickup_location,dropoff_location,package_details,delivery_time,delivery_fee)
-		VALUES (?,?,?,?,?,?)`, uid, in.PickupLocation, in.DropoffLocation, in.PackageDetails, when, in.DeliveryFee)
+	res, err := tx.Exec(`INSERT INTO orders (user_id,pickup_location,dropoff_location,customer_name,customer_phone,
+		package_details,delivery_time,delivery_fee,collect_amount) VALUES (?,?,?,?,?,?,?,?,?)`,
+		uid, in.PickupLocation, in.DropoffLocation, in.CustomerName, in.CustomerPhone,
+		in.PackageDetails, when, in.DeliveryFee, in.CollectAmount)
 	if err != nil {
 		serverError(w, err)
 		return
@@ -192,9 +208,12 @@ func (a *app) adminUpdate(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		PickupLocation  *string  `json:"pickup_location"`
 		DropoffLocation *string  `json:"dropoff_location"`
+		CustomerName    *string  `json:"customer_name"`
+		CustomerPhone   *string  `json:"customer_phone"`
 		PackageDetails  *string  `json:"package_details"`
 		DeliveryTime    *string  `json:"delivery_time"`
 		DeliveryFee     *float64 `json:"delivery_fee"`
+		CollectAmount   *float64 `json:"collect_amount"`
 		Status          *string  `json:"status"`
 	}
 	if !common.Decode(w, r, &in) {
@@ -217,6 +236,27 @@ func (a *app) adminUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.PackageDetails != nil {
 		o.PackageDetails = strings.TrimSpace(*in.PackageDetails)
+	}
+	if in.CustomerName != nil {
+		o.CustomerName = strings.TrimSpace(*in.CustomerName)
+		if len(o.CustomerName) < 2 || len(o.CustomerName) > 100 {
+			common.Error(w, http.StatusBadRequest, "customer_name must be 2-100 characters")
+			return
+		}
+	}
+	if in.CustomerPhone != nil {
+		o.CustomerPhone = strings.TrimSpace(*in.CustomerPhone)
+		if !common.PhoneRe.MatchString(o.CustomerPhone) {
+			common.Error(w, http.StatusBadRequest, "customer_phone must be 8-15 digits (optional leading +)")
+			return
+		}
+	}
+	if in.CollectAmount != nil {
+		if *in.CollectAmount < 0 {
+			common.Error(w, http.StatusBadRequest, "collect_amount cannot be negative")
+			return
+		}
+		o.CollectAmount = *in.CollectAmount
 	}
 	if in.DeliveryFee != nil {
 		if *in.DeliveryFee < 0 {
@@ -250,8 +290,10 @@ func (a *app) adminUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(`UPDATE orders SET pickup_location=?,dropoff_location=?,package_details=?,delivery_time=?,delivery_fee=?,status=? WHERE id=?`,
-		o.PickupLocation, o.DropoffLocation, o.PackageDetails, o.DeliveryTime, o.DeliveryFee, o.Status, id)
+	_, err = tx.Exec(`UPDATE orders SET pickup_location=?,dropoff_location=?,customer_name=?,customer_phone=?,
+		package_details=?,delivery_time=?,delivery_fee=?,collect_amount=?,status=? WHERE id=?`,
+		o.PickupLocation, o.DropoffLocation, o.CustomerName, o.CustomerPhone,
+		o.PackageDetails, o.DeliveryTime, o.DeliveryFee, o.CollectAmount, o.Status, id)
 	if err != nil {
 		serverError(w, err)
 		return

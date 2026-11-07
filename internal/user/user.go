@@ -15,10 +15,7 @@ import (
 	"package-tracking/internal/common"
 )
 
-var (
-	emailRe = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
-	phoneRe = regexp.MustCompile(`^\+?[0-9]{8,15}$`)
-)
+var emailRe = regexp.MustCompile(`^[^@\s]+@[^@\s]+\.[^@\s]+$`)
 
 type app struct{ db *sql.DB }
 
@@ -46,7 +43,7 @@ func (in *userInput) normalizeAndValidate() string {
 		return "name must be 2-100 characters"
 	case !emailRe.MatchString(in.Email):
 		return "invalid email"
-	case !phoneRe.MatchString(in.Phone):
+	case !common.PhoneRe.MatchString(in.Phone):
 		return "phone must be 8-15 digits (optional leading +)"
 	case len(in.Password) < 6:
 		return "password must be at least 6 characters"
@@ -159,6 +156,7 @@ func (a *app) seed() {
 	for _, s := range []struct{ role, name, email, pass, phone string }{
 		{"admin", "Admin", common.Env("ADMIN_EMAIL", "admin@example.com"), common.Env("ADMIN_PASSWORD", "Admin@123"), "01000000000"},
 		{"courier", "Demo Courier", common.Env("COURIER_EMAIL", "courier@example.com"), common.Env("COURIER_PASSWORD", "Courier@123"), "01111111111"},
+		{"courier", "Demo Courier2", common.Env("COURIER_EMAIL", "courier2@example.com"), common.Env("COURIER_PASSWORD", "Courier@123"), "01111111111"},
 	} {
 		var n int
 		_ = a.db.QueryRow(`SELECT COUNT(*) FROM users WHERE email=?`, s.email).Scan(&n)

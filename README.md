@@ -22,6 +22,10 @@ Seeded accounts: `admin@example.com / Admin@123`, `courier@example.com / Courier
 Without Docker: start MySQL, run `db/init.sql`, `go mod tidy`, then
 `go run ./cmd/server` with env `DB_DSN`, `JWT_SECRET`, `PORT` (default 8080).
 
+Database created before the customer columns existed? Run the migration once:
+`docker exec -i tracker-mysql mysql -uroot -proot < db/migrations/001_customer_and_collect.sql`
+(or `docker compose down -v` to start the compose database from scratch).
+
 ## Auth
 `POST /api/auth/login` returns `{token, user}`. Send `Authorization: Bearer <token>` afterwards.
 Roles: `user`, `courier`, `admin`.
@@ -51,7 +55,21 @@ admin assign/reassign sets `assigned`.
 | GET | /api/admin/assignments | admin |
 | PUT | /api/admin/orders/{id}/assign `{"courier_id":2}` | admin |
 
-Create-order body: `{"pickup_location","dropoff_location","package_details","delivery_time":"2026-11-12T14:00","delivery_fee":50}`
+Create-order body (all required except `collect_amount`, which defaults to 0):
+```json
+{
+  "pickup_location": "12 Abbas El Akkad St, Nasr City, Cairo",
+  "dropoff_location": "5 Mourad St, Dokki, Giza",
+  "customer_name": "Mariam Adel",
+  "customer_phone": "01112345678",
+  "package_details": "2 cotton shirts (1.5 kg)",
+  "delivery_time": "2026-11-12T12:00",
+  "delivery_fee": 60,
+  "collect_amount": 1250
+}
+```
+`customer_name` 2-100 characters, `customer_phone` 8-15 digits (optional leading +), money not negative.
+Order responses also carry `seller: {name, phone}` so the courier can reach the seller for pickup.
 
-Frontend (React): one base URL, `http://localhost:8080`.
+Frontend (React): set `VITE_API_URL=http://localhost:8080/api` in the frontend's `.env.local`.
 Postman: import `postman/PackageTracking.postman_collection.json` (login requests save tokens).

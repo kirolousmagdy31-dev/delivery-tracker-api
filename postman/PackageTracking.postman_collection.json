@@ -318,7 +318,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pickup_location\": \"Nasr City, Cairo\",\n  \"dropoff_location\": \"Maadi, Cairo\",\n  \"package_details\": \"Clothes, 2 kg\",\n  \"delivery_time\": \"2026-11-12T14:00\",\n  \"delivery_fee\": 50\n}"
+              "raw": "{\n  \"pickup_location\": \"12 Abbas El Akkad St, Building 4, Nasr City, Cairo\",\n  \"dropoff_location\": \"5 Mourad St, Apartment 7, Dokki, Giza\",\n  \"customer_name\": \"Mariam Adel\",\n  \"customer_phone\": \"01112345678\",\n  \"package_details\": \"2 cotton shirts (1.5 kg)\",\n  \"delivery_time\": \"2026-11-12T12:00\",\n  \"delivery_fee\": 60,\n  \"collect_amount\": 1250\n}"
             }
           },
           "event": [
@@ -327,7 +327,62 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.collectionVariables.set('order_id', pm.response.json().id);"
+                  "pm.test('order created', () => pm.response.to.have.status(201));",
+                  "const order = pm.response.json();",
+                  "pm.test('customer and cash to collect are stored', () => {",
+                  "  pm.expect(order.customer_name).to.eql('Mariam Adel');",
+                  "  pm.expect(order.customer_phone).to.eql('01112345678');",
+                  "  pm.expect(order.collect_amount).to.eql(1250);",
+                  "});",
+                  "pm.collectionVariables.set('order_id', order.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create order: invalid customer phone (#4, expects 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{user_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickup_location\": \"12 Abbas El Akkad St, Building 4, Nasr City, Cairo\",\n  \"dropoff_location\": \"5 Mourad St, Apartment 7, Dokki, Giza\",\n  \"customer_name\": \"Mariam Adel\",\n  \"customer_phone\": \"12ab\",\n  \"package_details\": \"2 cotton shirts (1.5 kg)\",\n  \"delivery_time\": \"2026-11-12T12:00\",\n  \"delivery_fee\": 60,\n  \"collect_amount\": 1250\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejected with 400', () => pm.response.to.have.status(400));",
+                  "pm.test('says what is wrong', () => pm.expect(pm.response.json().error).to.include('customer_phone'));"
                 ]
               }
             }
@@ -500,7 +555,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"dropoff_location\": \"Zamalek, Cairo\",\n  \"status\": \"pending\"\n}"
+              "raw": "{\n  \"customer_phone\": \"01198765432\",\n  \"collect_amount\": 1400,\n  \"status\": \"pending\"\n}"
             }
           }
         },
